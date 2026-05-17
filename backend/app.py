@@ -96,16 +96,17 @@ def create_app():
     return app
 
 
+# Initialize database on startup
+try:
+    init_db()
+except Exception as e:
+    print(f"Database initialization error: {e}")
+
+# Create app instance for gunicorn
+app = create_app()
+
 if __name__ == '__main__':
-    # Initialize database
-    try:
-        init_db()
-        print("Database initialized successfully!")
-    except Exception as e:
-        print(f"Database initialization error: {e}")
-    
-    # Create and run app
-    app = create_app()
+    print("Database initialized successfully!")
     
     print("\n" + "="*60)
     print("Bookstore API with AIRA Integration")
