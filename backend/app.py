@@ -21,14 +21,13 @@ def create_app():
     # Load configuration
     app.config.from_object(Config)
     
-    # Set up CORS
-    CORS(app, resources={
-        r"/api/*": {
-            "origins": Config.FRONTEND_URL,
-            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-            "allow_headers": ["Content-Type", "Authorization"]
-        }
-    })
+    # Set up CORS - Allow all routes
+    CORS(app,
+         resources={r"/*": {"origins": "*"}},
+         supports_credentials=True,
+         allow_headers=["Content-Type", "Authorization", "Access-Control-Allow-Credentials"],
+         methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+         expose_headers=["Content-Type", "Authorization"])
     
     # Set up JWT
     jwt = JWTManager(app)
