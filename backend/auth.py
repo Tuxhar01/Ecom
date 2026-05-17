@@ -1,7 +1,7 @@
 from functools import wraps
 from flask import g
 from flask_jwt_extended import verify_jwt_in_request, get_jwt_identity
-from models import User, db_session
+from models import User
 
 
 def jwt_required_with_user(fn):
@@ -14,8 +14,8 @@ def jwt_required_with_user(fn):
         verify_jwt_in_request()
         user_id = get_jwt_identity()
         
-        # Load user from database
-        user = db_session.query(User).filter_by(id=user_id).first()
+        # Load user from in-memory storage
+        user = User.get_by_id(user_id)
         
         if not user:
             return {'error': 'User not found'}, 404

@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from models import Book, db_session
+from models import Book
 from auth import jwt_required_with_user, get_current_user
 import logging
 
@@ -40,11 +40,7 @@ def test_database_error():
     """
     try:
         # Simulate database connection failure
-        db_session.close()
-        db_session.bind.dispose()
-        
-        # Attempt query that will fail
-        db_session.query(Book).first()
+        raise DatabaseError("Simulated database connection failure - in-memory storage unavailable")
         
     except Exception as e:
         logger.critical(
@@ -122,7 +118,7 @@ def test_stock_error():
         quantity = data.get('quantity', 1000)
         
         # Get book
-        book = db_session.query(Book).filter_by(id=book_id).first()
+        book = Book.get_by_id(book_id)
         
         if not book:
             raise ValueError(f"Book with ID {book_id} not found")

@@ -15,7 +15,7 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
     # CORS Configuration
-    FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:5173')
+    FRONTEND_URL = os.getenv('FRONTEND_URL', 'https://ecom-navy-three.vercel.app')
     
     # AIRA Configuration
     AIRA_WEBHOOK_URL = os.getenv('AIRA_WEBHOOK_URL')

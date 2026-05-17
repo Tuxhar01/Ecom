@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from models import Cart, Book, db_session
+from models import Cart, Book
 from auth import jwt_required_with_user, get_current_user
 import logging
 
@@ -14,9 +14,13 @@ def get_cart():
     try:
         user = get_current_user()
         
-        cart_items = db_session.query(Cart).filter_by(user_id=user.id).all()
+        cart_items = Cart.get_by_user(user.id)
         
-        total = sum(item.book.price * item.quantity for item in cart_items if item.book)
+        total = sum(
+            Book.get_by_id(item.book_id).price * item.quantity 
+            for item in cart_items 
+            if Book.get_by_id(item.book_id)
+        )
         
         return jsonify({
             'items': [item.to_dict() for item in cart_items],
@@ -44,7 +48,7 @@ def add_to_cart():
         quantity = data.get('quantity', 1)
         
         # Check if book exists
-        book = db_session.query(Book).filter_by(id=book_id).first()
+        book = Book.get_by_id(book_id)
         if not book:
             return jsonify({'error': 'Book not found'}), 404
         
@@ -58,14 +62,12 @@ def add_to_cart():
             }), 400
         
         # Check if item already in cart
-        cart_item = db_session.query(Cart).filter_by(
-            user_id=user.id,
-            book_id=book_id
-        ).first()
+        cart_item = Cart.get_by_user_and_book(user.id, book_id)
         
         if cart_item:
             # Update quantity
             cart_item.quantity += quantity
+            cart_item.save()
         else:
             # Create new cart item
             cart_item = Cart(
@@ -73,16 +75,13 @@ def add_to_cart():
                 book_id=book_id,
                 quantity=quantity
             )
-            db_session.add(cart_item)
-        
-        db_session.commit()
+            cart_item.save()
         
         logger.info(f"User {user.id} added book {book_id} to cart")
         
         return jsonify(cart_item.to_dict()), 201
         
     except Exception as e:
-        db_session.rollback()
         logger.error(f"Error adding to cart: {str(e)}", exc_info=True)
         return jsonify({'error': 'Failed to add to cart'}), 500
 
@@ -104,32 +103,29 @@ def update_cart_item(cart_id):
             return jsonify({'error': 'Quantity must be at least 1'}), 400
         
         # Get cart item
-        cart_item = db_session.query(Cart).filter_by(
-            id=cart_id,
-            user_id=user.id
-        ).first()
+        cart_item = Cart.get_by_id(cart_id)
         
-        if not cart_item:
+        if not cart_item or cart_item.user_id != user.id:
             return jsonify({'error': 'Cart item not found'}), 404
         
         # Check stock
-        if cart_item.book.stock < quantity:
+        book = Book.get_by_id(cart_item.book_id)
+        if book and book.stock < quantity:
             logger.warning(f"Insufficient stock for book {cart_item.book_id}")
             return jsonify({
                 'error': 'Insufficient stock',
                 'severity': 'P2',
-                'available': cart_item.book.stock
+                'available': book.stock
             }), 400
         
         cart_item.quantity = quantity
-        db_session.commit()
+        cart_item.save()
         
         logger.info(f"User {user.id} updated cart item {cart_id}")
         
         return jsonify(cart_item.to_dict()), 200
         
     except Exception as e:
-        db_session.rollback()
         logger.error(f"Error updating cart item: {str(e)}", exc_info=True)
         return jsonify({'error': 'Failed to update cart item'}), 500
 
@@ -141,23 +137,18 @@ def remove_from_cart(cart_id):
     try:
         user = get_current_user()
         
-        cart_item = db_session.query(Cart).filter_by(
-            id=cart_id,
-            user_id=user.id
-        ).first()
+        cart_item = Cart.get_by_id(cart_id)
         
-        if not cart_item:
+        if not cart_item or cart_item.user_id != user.id:
             return jsonify({'error': 'Cart item not found'}), 404
         
-        db_session.delete(cart_item)
-        db_session.commit()
+        cart_item.delete()
         
         logger.info(f"User {user.id} removed cart item {cart_id}")
         
         return jsonify({'message': 'Item removed from cart'}), 200
         
     except Exception as e:
-        db_session.rollback()
         logger.error(f"Error removing from cart: {str(e)}", exc_info=True)
         return jsonify({'error': 'Failed to remove from cart'}), 500
 
@@ -169,15 +160,13 @@ def clear_cart():
     try:
         user = get_current_user()
         
-        db_session.query(Cart).filter_by(user_id=user.id).delete()
-        db_session.commit()
+        Cart.clear_user_cart(user.id)
         
         logger.info(f"User {user.id} cleared cart")
         
         return jsonify({'message': 'Cart cleared'}), 200
         
     except Exception as e:
-        db_session.rollback()
         logger.error(f"Error clearing cart: {str(e)}", exc_info=True)
         return jsonify({'error': 'Failed to clear cart'}), 500
 

@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import create_access_token
-from models import User, db_session
+from models import User
 import logging
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
@@ -19,23 +19,23 @@ def register():
             return jsonify({'error': 'Email, username, and password are required'}), 400
         
         # Check if user already exists
-        existing_user = db_session.query(User).filter(
-            (User.email == data['email']) | (User.username == data['username'])
-        ).first()
-        
+        existing_user = User.get_by_email(data['email'])
         if existing_user:
-            logger.warning(f"Registration attempt with existing email/username: {data['email']}")
-            return jsonify({'error': 'User with this email or username already exists'}), 409
+            logger.warning(f"Registration attempt with existing email: {data['email']}")
+            return jsonify({'error': 'User with this email already exists'}), 409
+        
+        existing_user = User.get_by_username(data['username'])
+        if existing_user:
+            logger.warning(f"Registration attempt with existing username: {data['username']}")
+            return jsonify({'error': 'User with this username already exists'}), 409
         
         # Create new user
         user = User(
             email=data['email'],
-            username=data['username']
+            username=data['username'],
+            password=data['password']
         )
-        user.set_password(data['password'])
-        
-        db_session.add(user)
-        db_session.commit()
+        user.save()
         
         logger.info(f"New user registered: {user.email}")
         
@@ -45,7 +45,6 @@ def register():
         }), 201
         
     except Exception as e:
-        db_session.rollback()
         logger.error(f"Registration error: {str(e)}", exc_info=True)
         return jsonify({'error': 'Registration failed'}), 500
 
@@ -62,7 +61,7 @@ def login():
             return jsonify({'error': 'Email and password are required'}), 400
         
         # Find user
-        user = db_session.query(User).filter_by(email=data['email']).first()
+        user = User.get_by_email(data['email'])
         
         if not user or not user.check_password(data['password']):
             logger.warning(f"Failed login attempt for email: {data['email']}")
@@ -87,7 +86,6 @@ def login():
 def get_current_user_info():
     """Get current user information (requires JWT)."""
     from flask_jwt_extended import jwt_required, get_jwt_identity
-    from auth import jwt_required_with_user, get_current_user
     
     try:
         # Verify JWT
@@ -95,7 +93,7 @@ def get_current_user_info():
         user_id = get_jwt_identity()
         
         # Get user
-        user = db_session.query(User).filter_by(id=user_id).first()
+        user = User.get_by_id(user_id)
         
         if not user:
             return jsonify({'error': 'User not found'}), 404
