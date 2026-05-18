@@ -19,7 +19,6 @@ class Config:
     
     # AIRA Configuration
     AIRA_WEBHOOK_URL = os.getenv('AIRA_WEBHOOK_URL')
-    AIRA_API_KEY = os.getenv('AIRA_API_KEY')
     AIRA_ENABLED = os.getenv('AIRA_ENABLED', 'true').lower() == 'true'
     AIRA_LOG_LEVEL = os.getenv('AIRA_LOG_LEVEL', 'ERROR')
     AIRA_MAX_RETRIES = int(os.getenv('AIRA_MAX_RETRIES', 3))

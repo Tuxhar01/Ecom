@@ -49,7 +49,6 @@ class AIRAHandler(logging.Handler):
     def __init__(self):
         super().__init__()
         self.webhook_url = Config.AIRA_WEBHOOK_URL
-        self.api_key = Config.AIRA_API_KEY
         self.enabled = Config.AIRA_ENABLED
         self.max_retries = Config.AIRA_MAX_RETRIES
         self.timeout = Config.AIRA_TIMEOUT
@@ -61,8 +60,8 @@ class AIRAHandler(logging.Handler):
         # Only handle ERROR and above
         self.setLevel(logging.ERROR)
         
-        if not self.webhook_url or not self.api_key:
-            print("WARNING: AIRA webhook URL or API key not configured. Error logging disabled.")
+        if not self.webhook_url:
+            print("WARNING: AIRA webhook URL not configured. Error logging disabled.")
             self.enabled = False
     
     def emit(self, record):
@@ -166,8 +165,7 @@ class AIRAHandler(logging.Handler):
     def _send_with_retry(self, payload):
         """Send payload to AIRA webhook with exponential backoff retry."""
         headers = {
-            'Content-Type': 'application/json',
-            'X-API-Key': self.api_key
+            'Content-Type': 'application/json'
         }
         
         for attempt in range(self.max_retries):
