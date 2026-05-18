@@ -48,7 +48,14 @@ class AIRAHandler(logging.Handler):
     
     def __init__(self):
         super().__init__()
-        self.webhook_url = Config.AIRA_WEBHOOK_URL
+        # Fix double slashes in webhook URL
+        webhook_url = Config.AIRA_WEBHOOK_URL
+        if webhook_url:
+            # Replace multiple slashes with single slash (except after http:// or https://)
+            import re
+            webhook_url = re.sub(r'(?<!:)/{2,}', '/', webhook_url)
+        
+        self.webhook_url = webhook_url
         self.enabled = Config.AIRA_ENABLED
         self.max_retries = Config.AIRA_MAX_RETRIES
         self.timeout = Config.AIRA_TIMEOUT
@@ -62,6 +69,9 @@ class AIRAHandler(logging.Handler):
         
         # Debug logging
         print(f"[AIRA] Initializing handler...")
+        if Config.AIRA_WEBHOOK_URL != webhook_url:
+            print(f"[AIRA] Original URL: {Config.AIRA_WEBHOOK_URL}")
+            print(f"[AIRA] Fixed URL: {webhook_url}")
         print(f"[AIRA] Webhook URL: {self.webhook_url}")
         print(f"[AIRA] Enabled: {self.enabled}")
         
