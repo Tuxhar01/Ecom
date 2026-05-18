@@ -60,26 +60,46 @@ class AIRAHandler(logging.Handler):
         # Only handle ERROR and above
         self.setLevel(logging.ERROR)
         
+        # Debug logging
+        print(f"[AIRA] Initializing handler...")
+        print(f"[AIRA] Webhook URL: {self.webhook_url}")
+        print(f"[AIRA] Enabled: {self.enabled}")
+        
         if not self.webhook_url:
-            print("WARNING: AIRA webhook URL not configured. Error logging disabled.")
+            print("[AIRA] WARNING: AIRA webhook URL not configured. Error logging disabled.")
             self.enabled = False
+        elif not self.enabled:
+            print("[AIRA] WARNING: AIRA is disabled via AIRA_ENABLED setting.")
+        else:
+            print(f"[AIRA] Successfully initialized. Ready to send errors to {self.webhook_url}")
     
     def emit(self, record):
         """Process and send log record to AIRA."""
+        print(f"[AIRA] emit() called - enabled: {self.enabled}, level: {record.levelname}")
+        
         if not self.enabled:
+            print(f"[AIRA] Skipping - AIRA is disabled")
             return
         
         # Check rate limit
         if not self.rate_limiter.allow_request():
-            print(f"AIRA rate limit exceeded, skipping error: {record.getMessage()}")
+            print(f"[AIRA] Rate limit exceeded, skipping error: {record.getMessage()}")
             return
         
         try:
+            print(f"[AIRA] Processing error: {record.getMessage()}")
+            
             # Build the payload
             payload = self._build_payload(record)
+            print(f"[AIRA] Payload built, sending to {self.webhook_url}")
             
             # Send to AIRA (with retry logic)
-            self._send_with_retry(payload)
+            success = self._send_with_retry(payload)
+            
+            if success:
+                print(f"[AIRA] Successfully sent error to AIRA")
+            else:
+                print(f"[AIRA] Failed to send error to AIRA")
             
         except Exception as e:
             # Don't let AIRA errors break the application
@@ -168,14 +188,20 @@ class AIRAHandler(logging.Handler):
             'Content-Type': 'application/json'
         }
         
+        print(f"[AIRA] Attempting to send to webhook: {self.webhook_url}")
+        
         for attempt in range(self.max_retries):
             try:
+                print(f"[AIRA] Attempt {attempt + 1}/{self.max_retries}")
+                
                 response = requests.post(
                     self.webhook_url,
                     json=payload,
                     headers=headers,
                     timeout=self.timeout
                 )
+                
+                print(f"[AIRA] Response status: {response.status_code}")
                 
                 if response.status_code == 200:
                     return True
@@ -205,13 +231,17 @@ def setup_aira_logging(app):
         )
         aira_handler.setFormatter(formatter)
         
-        # Add to app logger
-        app.logger.addHandler(aira_handler)
+        # Add to root logger first - this catches ALL loggers
+        root_logger = logging.getLogger()
+        root_logger.addHandler(aira_handler)
+        root_logger.setLevel(logging.ERROR)  # Ensure root logger captures errors
         
-        # Also add to root logger to catch all errors
-        logging.getLogger().addHandler(aira_handler)
+        # Also add to app logger for good measure
+        app.logger.addHandler(aira_handler)
+        app.logger.setLevel(logging.ERROR)
         
         app.logger.info("AIRA error monitoring initialized")
+        print(f"[AIRA] Handler added to root logger and app logger")
     else:
         app.logger.warning("AIRA error monitoring is disabled")
 
